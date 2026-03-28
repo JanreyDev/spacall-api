@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\UploadedFile;
+use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
@@ -241,10 +242,14 @@ class AuthController extends Controller
             ]
         );
 
-        // Assign Spatie Role
+        // Assign Spatie Role (create missing role records on-the-fly)
         $roleName = $user->role ?? 'client';
+        $role = Role::firstOrCreate([
+            'name' => $roleName,
+            'guard_name' => 'web',
+        ]);
         if (!$user->hasRole($roleName)) {
-            $user->assignRole($roleName);
+            $user->assignRole($role);
         }
 
         if ($user->role === 'therapist') {
@@ -348,7 +353,11 @@ class AuthController extends Controller
 
         // Fix missing roles for existing users
         if ($user->role && !$user->hasRole($user->role)) {
-            $user->assignRole($user->role);
+            $role = Role::firstOrCreate([
+                'name' => $user->role,
+                'guard_name' => 'web',
+            ]);
+            $user->assignRole($role);
         }
 
         if ($user->status !== User::STATUS_ACTIVE) {
