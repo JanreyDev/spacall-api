@@ -52,6 +52,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\AdminMiddleware::class])
 
     // Services Management
     Route::get('/services/categories', [\App\Http\Controllers\Api\AdminServiceController::class, 'categories']);
+    Route::post('/services/categories', [\App\Http\Controllers\Api\AdminServiceController::class, 'storeCategory']);
     Route::post('/services/upload-image', [\App\Http\Controllers\Api\AdminServiceController::class, 'uploadImage']);
     Route::apiResource('services', \App\Http\Controllers\Api\AdminServiceController::class);
 
@@ -131,7 +132,6 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::post('/paymongo/webhook', [PaymongoWebhookController::class, 'handle']);
-
 
 
 

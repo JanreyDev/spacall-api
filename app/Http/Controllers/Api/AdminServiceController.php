@@ -49,6 +49,37 @@ class AdminServiceController extends Controller
     }
 
     /**
+     * Store a newly created service category.
+     */
+    public function storeCategory(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:service_categories,name',
+            'description' => 'nullable|string',
+            'sort_order' => 'nullable|integer',
+            'icon_url' => 'nullable|url|max:2048',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $validated['slug'] = Str::slug($validated['name']);
+
+        if (!array_key_exists('sort_order', $validated) || $validated['sort_order'] === null) {
+            $validated['sort_order'] = 0;
+        }
+
+        if (!array_key_exists('is_active', $validated) || $validated['is_active'] === null) {
+            $validated['is_active'] = true;
+        }
+
+        $category = ServiceCategory::create($validated);
+
+        return response()->json([
+            'message' => 'Category created successfully',
+            'category' => $category
+        ], 201);
+    }
+
+    /**
      * Store a newly created service.
      */
     public function store(Request $request): JsonResponse
