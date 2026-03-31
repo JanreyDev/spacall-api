@@ -73,7 +73,10 @@ class TierController extends Controller
         // Ensure latest assignments are reflected before listing members.
         $this->vipService->reevaluateAll();
 
-        $members = \App\Models\Provider::with([
+        $allTiers = Tier::orderBy('level', 'asc')->get();
+        $baseTier = $allTiers->first();
+
+        $therapists = \App\Models\Provider::with([
             'user',
             'therapistProfile',
             'therapistStat',
@@ -81,9 +84,35 @@ class TierController extends Controller
                 $q->orderBy('recorded_at', 'desc')->take(1);
             }
         ])
-            ->where('current_tier_id', $tier->id)
             ->where('type', 'therapist')
             ->get();
+
+        $members = $therapists->filter(function ($provider) use ($allTiers, $baseTier, $tier) {
+            $stats = $provider->therapistStat;
+
+            $eligibleTier = $allTiers
+                ->filter(function ($candidate) use ($stats) {
+                    $onlineMinutes = $stats ? (int) $stats->total_online_minutes : 0;
+                    $extensions = $stats ? (int) $stats->total_extensions : 0;
+                    $bookings = $stats ? (int) $stats->total_bookings : 0;
+
+                    return $onlineMinutes >= (int) $candidate->online_minutes_required
+                        && $extensions >= (int) $candidate->extensions_required
+                        && $bookings >= (int) $candidate->bookings_required;
+                })
+                ->sortByDesc('level')
+                ->first();
+
+            if (!$eligibleTier) {
+                $eligibleTier = $baseTier;
+            }
+
+            if ($eligibleTier && (int) $provider->current_tier_id !== (int) $eligibleTier->id) {
+                $provider->update(['current_tier_id' => $eligibleTier->id]);
+            }
+
+            return $eligibleTier && (int) $eligibleTier->id === (int) $tier->id;
+        })->values();
 
         return response()->json([
             'tier' => $tier,

@@ -83,9 +83,14 @@ class VipService
      */
     public function checkEligibility(Provider $provider)
     {
-        $stats = $provider->therapistStat;
-        if (!$stats)
+        if ($provider->type !== 'therapist') {
             return;
+        }
+
+        $stats = $provider->therapistStat()->firstOrCreate(
+            ['provider_id' => $provider->id],
+            ['total_online_minutes' => 0, 'total_extensions' => 0, 'total_bookings' => 0]
+        );
 
         // Find highest level available based on requirements
         $eligibleTier = Tier::where('online_minutes_required', '<=', $stats->total_online_minutes)
@@ -94,7 +99,12 @@ class VipService
             ->orderBy('level', 'desc')
             ->first();
 
-        if ($eligibleTier) {
+        // Fallback to base tier so every therapist is always assigned to one tier.
+        if (!$eligibleTier) {
+            $eligibleTier = Tier::orderBy('level', 'asc')->first();
+        }
+
+        if ($eligibleTier && (int) $provider->current_tier_id !== (int) $eligibleTier->id) {
             $provider->update(['current_tier_id' => $eligibleTier->id]);
         }
     }
