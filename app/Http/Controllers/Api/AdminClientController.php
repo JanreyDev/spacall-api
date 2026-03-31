@@ -52,7 +52,7 @@ class AdminClientController extends Controller
                     $query
                         ->with([
                             'service:id,name,duration_minutes',
-                            'provider.user:id,first_name,last_name,email,profile_photo_url',
+                            'provider.user:id,first_name,last_name,profile_photo_url',
                             'location:booking_id,address,latitude,longitude',
                         ])
                         ->latest()
