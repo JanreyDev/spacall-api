@@ -40,4 +40,29 @@ class AdminClientController extends Controller
             'clients' => $clients
         ]);
     }
+
+    /**
+     * Display a specific client with recent booking history.
+     */
+    public function show(int $id): JsonResponse
+    {
+        $client = User::where('role', 'client')
+            ->with([
+                'bookings' => function ($query) {
+                    $query
+                        ->with([
+                            'service:id,name,duration_minutes',
+                            'provider.user:id,first_name,last_name,email,profile_photo_url',
+                            'location:booking_id,address,latitude,longitude',
+                        ])
+                        ->latest()
+                        ->take(10);
+                },
+            ])
+            ->findOrFail($id);
+
+        return response()->json([
+            'client' => $client,
+        ]);
+    }
 }

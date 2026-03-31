@@ -42,6 +42,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\AdminMiddleware::class])
     Route::post('/logout', [\App\Http\Controllers\Api\AdminAuthController::class, 'logout']);
     Route::get('/therapists', [\App\Http\Controllers\Api\AdminTherapistController::class, 'index']);
     Route::get('/clients', [\App\Http\Controllers\Api\AdminClientController::class, 'index']);
+    Route::get('/clients/{id}', [\App\Http\Controllers\Api\AdminClientController::class, 'show']);
     Route::get('/bookings', [\App\Http\Controllers\Api\AdminBookingController::class, 'index']);
     Route::get('/reviews', [\App\Http\Controllers\Api\AdminReviewController::class, 'index']);
     Route::get('/dashboard-stats', [\App\Http\Controllers\Api\AdminDashboardController::class, 'index']);
@@ -132,7 +133,6 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::post('/paymongo/webhook', [PaymongoWebhookController::class, 'handle']);
-
 
 
 
