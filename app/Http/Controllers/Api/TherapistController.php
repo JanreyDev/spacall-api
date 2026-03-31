@@ -265,6 +265,94 @@ class TherapistController extends Controller
     }
 
     /**
+     * Get services offered by the authenticated provider (therapist/store).
+     */
+    public function services(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $provider = $user->providers()->whereIn('type', ['therapist', 'store'])->first()
+            ?? $user->providers()->first();
+
+        if (!$provider) {
+            return response()->json([
+                'message' => 'Provider profile not found.'
+            ], 404);
+        }
+
+        $provider->load([
+            'services' => function ($q) {
+                $q->with('category')->where('is_active', true)->orderBy('sort_order');
+            }
+        ]);
+
+        return response()->json([
+            'provider_id' => $provider->id,
+            'provider_type' => $provider->type,
+            'services' => $provider->services->values(),
+        ]);
+    }
+
+    /**
+     * Sync services offered by authenticated provider.
+     * Expected payload:
+     * {
+     *   "services": [
+     *     {"service_id": 1, "price": 500, "is_available": true}
+     *   ]
+     * }
+     */
+    public function syncServices(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'services' => 'required|array|min:1',
+            'services.*.service_id' => 'required|exists:services,id',
+            'services.*.price' => 'required|numeric|min:0',
+            'services.*.is_available' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+        $provider = $user->providers()->whereIn('type', ['therapist', 'store'])->first()
+            ?? $user->providers()->first();
+
+        if (!$provider) {
+            return response()->json([
+                'message' => 'Provider profile not found.'
+            ], 404);
+        }
+
+        $syncData = [];
+        foreach ($request->input('services', []) as $item) {
+            $serviceId = (int) $item['service_id'];
+            $syncData[$serviceId] = [
+                'price' => (float) $item['price'],
+                'is_available' => array_key_exists('is_available', $item)
+                    ? (bool) $item['is_available']
+                    : true,
+            ];
+        }
+
+        $provider->services()->sync($syncData);
+        $provider->load([
+            'services' => function ($q) {
+                $q->with('category')->where('is_active', true)->orderBy('sort_order');
+            }
+        ]);
+
+        return response()->json([
+            'message' => 'Services updated successfully.',
+            'provider_id' => $provider->id,
+            'services' => $provider->services->values(),
+        ]);
+    }
+
+    /**
      * Update therapist's current location.
      */
     public function updateLocation(Request $request): JsonResponse

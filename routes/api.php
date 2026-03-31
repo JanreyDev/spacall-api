@@ -81,6 +81,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/therapist/profile', [\App\Http\Controllers\Api\TherapistController::class, 'profile']);
     Route::post('/therapist/location', [\App\Http\Controllers\Api\TherapistController::class, 'updateLocation']);
     Route::post('/therapist/store-profile', [\App\Http\Controllers\Api\TherapistController::class, 'updateStoreProfile']);
+    Route::get('/therapist/services', [\App\Http\Controllers\Api\TherapistController::class, 'services']);
+    Route::post('/therapist/services', [\App\Http\Controllers\Api\TherapistController::class, 'syncServices']);
     Route::get('/therapist/active-requests', [\App\Http\Controllers\Api\TherapistController::class, 'activeRequests']);
     Route::get('/therapist/nearby-bookings', [\App\Http\Controllers\Api\TherapistController::class, 'nearbyBookings']);
     Route::get('/therapist/dashboard-stats', [\App\Http\Controllers\Api\TherapistController::class, 'dashboardStats']);
@@ -135,5 +137,4 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::post('/paymongo/webhook', [PaymongoWebhookController::class, 'handle']);
-
 
