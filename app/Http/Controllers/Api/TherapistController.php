@@ -542,7 +542,12 @@ class TherapistController extends Controller
                     ->orWhere(function ($sq) use ($threshold) {
                         $sq->where('schedule_type', 'scheduled')
                             ->whereNotNull('scheduled_at')
-                            ->where('scheduled_at', '<=', $threshold);
+                            ->where(function ($timing) use ($threshold) {
+                                // In-store appointments should be visible immediately
+                                // in request/store tabs (no 10-minute waiting window).
+                                $timing->where('booking_type', 'in_store')
+                                    ->orWhere('scheduled_at', '<=', $threshold);
+                            });
                     });
             })
             ->when($request->booking_type, function ($q) use ($request) {
