@@ -14,6 +14,10 @@ use Illuminate\Http\JsonResponse;
 use App\Services\VipService;
 use App\Models\StoreProfile;
 use App\Models\User;
+use App\Models\Service;
+use App\Models\ServiceCategory;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class TherapistController extends Controller
 {
@@ -350,6 +354,101 @@ class TherapistController extends Controller
             'provider_id' => $provider->id,
             'services' => $provider->services->values(),
         ]);
+    }
+
+    /**
+     * Create a custom service owned by the authenticated provider (store/therapist),
+     * then auto-attach it to provider services.
+     */
+    public function createCustomService(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:150',
+            'description' => 'nullable|string|max:3000',
+            'category_id' => 'nullable|exists:service_categories,id',
+            'duration_minutes' => 'required|integer|min:15|max:480',
+            'price' => 'required|numeric|min:0',
+            'thumbnail_url' => 'nullable|string|max:2048',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+        $provider = $user->providers()->whereIn('type', ['therapist', 'store'])->first()
+            ?? $user->providers()->first();
+
+        if (!$provider) {
+            return response()->json([
+                'message' => 'Provider profile not found.'
+            ], 404);
+        }
+
+        $categoryId = $request->input('category_id');
+        if (!$categoryId) {
+            $customCategory = ServiceCategory::firstOrCreate(
+                ['slug' => 'custom-services'],
+                [
+                    'name' => 'Custom Services',
+                    'description' => 'Provider-created custom services',
+                    'is_active' => true,
+                    'sort_order' => 999,
+                ]
+            );
+            $categoryId = $customCategory->id;
+        }
+
+        $price = (float) $request->input('price');
+        $name = trim((string) $request->input('name'));
+        $description = $request->input('description');
+
+        $imageUrl = $request->input('thumbnail_url');
+        if ($request->hasFile('photo')) {
+            $path = $request->file('photo')->store('services/custom', 'public');
+            $imageUrl = rtrim(env('APP_URL', config('app.url')), '/') . '/storage/' . ltrim($path, '/');
+        }
+
+        $slugBase = Str::slug($name);
+        $slug = $slugBase . '-' . $provider->id . '-' . substr((string) Str::uuid(), 0, 8);
+
+        $service = Service::create([
+            'category_id' => $categoryId,
+            'name' => $name,
+            'slug' => $slug,
+            'description' => $description,
+            'short_description' => $description ? Str::limit($description, 120) : null,
+            'currency' => 'PHP',
+            'image_url' => $imageUrl,
+            'duration_minutes' => (int) $request->input('duration_minutes'),
+            'base_price' => $price,
+            'vip_price' => $price,
+            'sort_order' => 999,
+            'is_active' => true,
+            'meta' => [
+                'is_custom' => true,
+                'created_by_provider_id' => $provider->id,
+                'created_by_user_id' => $user->id,
+            ],
+        ]);
+
+        $provider->services()->syncWithoutDetaching([
+            $service->id => [
+                'price' => $price,
+                'is_available' => true,
+            ],
+        ]);
+
+        $service->load('category');
+
+        return response()->json([
+            'message' => 'Custom service created successfully.',
+            'service' => $service,
+        ], 201);
     }
 
     /**
