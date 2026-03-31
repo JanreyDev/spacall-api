@@ -70,6 +70,9 @@ class TierController extends Controller
     {
         $tier = Tier::findOrFail($id);
 
+        // Ensure latest assignments are reflected before listing members.
+        $this->vipService->reevaluateAll();
+
         $members = \App\Models\Provider::with([
             'user',
             'therapistProfile',
