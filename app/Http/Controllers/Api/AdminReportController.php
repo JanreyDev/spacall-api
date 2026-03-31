@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Provider;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -97,12 +99,48 @@ class AdminReportController extends Controller
             ];
         });
 
+        // 5. Top Therapists
+        $topTherapists = Provider::where('type', 'therapist')
+            ->with('user')
+            ->orderByDesc('total_earnings')
+            ->take(10)
+            ->get()
+            ->map(function ($provider) {
+                return [
+                    'id' => (string) $provider->id,
+                    'name' => $provider->user
+                        ? trim(($provider->user->first_name ?? '') . ' ' . ($provider->user->last_name ?? ''))
+                        : 'Unknown Therapist',
+                    'bookings' => (int) ($provider->total_bookings ?? 0),
+                    'revenue' => (float) ($provider->total_earnings ?? 0),
+                    'rating' => (float) ($provider->average_rating ?? 0),
+                ];
+            })
+            ->values();
+
+        // 6. Client Metrics
+        $clientQuery = User::where('role', 'client');
+        $totalClients = (clone $clientQuery)->count();
+        $newClientsThisMonth = (clone $clientQuery)->where('created_at', '>=', Carbon::now()->startOfMonth())->count();
+        $returningClients = (clone $clientQuery)->where('total_bookings', '>', 1)->count();
+        $avgBookingsPerClient = (float) ((clone $clientQuery)->avg('total_bookings') ?? 0);
+        $avgSpendPerClient = (float) ((clone $clientQuery)->avg('total_spent') ?? 0);
+        $retentionRate = $totalClients > 0 ? round(($returningClients / $totalClients) * 100) : 0;
+
         return response()->json([
             'revenue_trends' => $revenueTrends,
             'service_popularity' => $servicePopularity,
             'peak_hours' => $formattedHeatmap,
-            'geographic_distribution' => $formattedGeoData
+            'geographic_distribution' => $formattedGeoData,
+            'top_therapists' => $topTherapists,
+            'client_metrics' => [
+                'total_clients' => $totalClients,
+                'new_clients_this_month' => $newClientsThisMonth,
+                'returning_clients' => $returningClients,
+                'retention_rate' => $retentionRate,
+                'avg_bookings_per_client' => round($avgBookingsPerClient, 1),
+                'avg_spend_per_client' => round($avgSpendPerClient, 2),
+            ],
         ]);
     }
 }
-
