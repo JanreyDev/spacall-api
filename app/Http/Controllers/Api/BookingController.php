@@ -434,14 +434,37 @@ class BookingController extends Controller
         DB::beginTransaction();
         try {
             if ($newStatus === 'accepted' && $isTherapist) {
-                $provider = $user->providers()->where('type', 'therapist')->first();
+                $therapistProvider = $user->providers()->where('type', 'therapist')->first();
+                $storeProvider = $user->providers()->where('type', 'store')->first();
+                $provider = $therapistProvider ?? $storeProvider;
                 if (!$provider) {
                     return response()->json(['message' => 'Therapist profile not found'], 404);
                 }
 
-                // If it's a direct booking, ensure it's for THIS provider
-                if ($booking->provider_id && $booking->provider_id !== $provider->id) {
-                    return response()->json(['message' => 'This booking was not assigned to you.'], 403);
+                // If booking is assigned, validate assignment ownership.
+                if ($booking->provider_id) {
+                    $assignedToCurrentProvider = ((int) $booking->provider_id === (int) $provider->id);
+
+                    // For in-store bookings, allow therapists who belong to the same store profile.
+                    if (!$assignedToCurrentProvider && $booking->booking_type === 'in_store' && $therapistProvider) {
+                        $assignedStoreProvider = Provider::with('storeProfile')->find($booking->provider_id);
+                        $assignedStoreProfileId = optional($assignedStoreProvider?->storeProfile)->id;
+                        $therapistStoreProfileId = optional($therapistProvider->therapistProfile)->store_profile_id;
+
+                        if (
+                            $assignedStoreProfileId &&
+                            $therapistStoreProfileId &&
+                            ((int) $assignedStoreProfileId === (int) $therapistStoreProfileId)
+                        ) {
+                            $assignedToCurrentProvider = true;
+                            // Re-assign booking to the accepting therapist provider.
+                            $provider = $therapistProvider;
+                        }
+                    }
+
+                    if (!$assignedToCurrentProvider) {
+                        return response()->json(['message' => 'This booking was not assigned to you.'], 403);
+                    }
                 }
 
                 if ($booking->status !== 'awaiting_assignment' && $booking->status !== 'pending') {
