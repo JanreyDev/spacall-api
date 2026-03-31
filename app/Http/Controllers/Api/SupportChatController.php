@@ -22,8 +22,8 @@ class SupportChatController extends Controller
 
         $status = $request->query('status', 'open');
 
-        $sessions = SupportSession::with(['user', 'messages' => function ($query) {
-            $query->latest()->first();
+        $sessions = SupportSession::with(['user', 'admin', 'messages' => function ($query) {
+            $query->latest();
         }])
         ->when($status !== 'all', function ($query) use ($status) {
             return $query->where('status', $status);
@@ -40,6 +40,9 @@ class SupportChatController extends Controller
                     'user_avatar' => $session->user->profile_photo_url,
                     'user_role' => $session->user->role, // Client or Therapist
                     'user_avatar' => $session->user->profile_photo_url,
+                    'admin_id' => $session->admin_id,
+                    'admin_name' => $session->admin ? ($session->admin->first_name . ' ' . $session->admin->last_name) : 'Admin Support',
+                    'admin_avatar' => $session->admin ? $session->admin->profile_photo_url : null,
                     'subject' => $session->subject,
                     'status' => $session->status,
                     'last_message' => $session->messages->first()->content ?? null,
