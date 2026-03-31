@@ -94,6 +94,11 @@ class Booking extends Model
         return $this->hasMany(BookingTimeline::class);
     }
 
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
     /**
      * Return a standardized minimal array for transport stability.
      */
