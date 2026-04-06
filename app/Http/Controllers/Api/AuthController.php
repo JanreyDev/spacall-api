@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\UploadedFile;
 use Spatie\Permission\Models\Role;
 
@@ -604,7 +605,8 @@ class AuthController extends Controller
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        $validator = Validator::make($request->all(), [
+        $hasEmailColumn = Schema::hasColumn('users', 'email');
+        $rules = [
             'first_name' => 'nullable|string|max:100',
             'middle_name' => 'nullable|string|max:100',
             'last_name' => 'nullable|string|max:100',
@@ -612,9 +614,16 @@ class AuthController extends Controller
             'gender' => 'nullable|in:male,female,lgbt',
             'age' => 'nullable|integer',
             'date_of_birth' => 'nullable|date',
-            'email' => 'nullable|email|unique:users,email,' . $user->id,
             'image' => 'nullable|image|max:8192', // Profile photo
-        ]);
+        ];
+
+        if ($hasEmailColumn) {
+            $rules['email'] = 'nullable|email|unique:users,email,' . $user->id;
+        } else {
+            $rules['email'] = 'nullable|email';
+        }
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
@@ -628,8 +637,11 @@ class AuthController extends Controller
             'gender',
             'age',
             'date_of_birth',
-            'email',
         ]);
+
+        if ($hasEmailColumn && $request->has('email')) {
+            $updateData['email'] = $request->input('email');
+        }
 
         // Filter out null values to avoid overwriting existing data with null if not intended
         // However, if the user explicitly sends empty string, we might want to update it.
